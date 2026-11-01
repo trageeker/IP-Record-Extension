@@ -1,9 +1,9 @@
 import { SOURCES, detect } from "./lib/ip.js";
 import {
   getRecords, getSettings, saveSettings, updateRecord, deleteRecord, clearAll,
-  search, byRecent, exportJson, exportCsv, importText,
+  search, byRecent, siteStats, exportJson, exportCsv, importText,
 } from "./lib/store.js";
-import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry } from "./lib/ui.js";
+import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 let records = [];
@@ -58,6 +58,7 @@ function row(r) {
     el("td", {},
       el("div", { class: "site" }, r.site),
       r.host !== r.site ? el("div", { class: "host" }, r.host) : null,
+      statsText(siteStats(records, r.site)) ? el("div", { class: "sub stats-line" }, statsText(siteStats(records, r.site))) : null,
     ),
     el("td", { title: srcTitle || null },
       el("div", { class: "ip" }, r.ip),

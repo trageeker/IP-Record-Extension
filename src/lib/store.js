@@ -39,6 +39,18 @@ async function putRecords(records) {
 const uid = () => (globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
 
 /** 按「最近使用」倒序 */
+/** 某站点最常用的 IP 和国家（按使用次数 seen 累加） */
+export function siteStats(records, site) {
+  const rs = records.filter((r) => r.site === site);
+  const total = rs.reduce((n, r) => n + (r.seen || 1), 0);
+  const top = (key) => {
+    const m = new Map();
+    for (const r of rs) if (r[key]) m.set(r[key], (m.get(r[key]) || 0) + (r.seen || 1));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
+  };
+  return { total, records: rs.length, ips: top("ip"), countries: top("country") };
+}
+
 export const byRecent = (a, b) => (b.lastSeenAt || b.createdAt) - (a.lastSeenAt || a.createdAt);
 
 export async function recordsForSite(site) {

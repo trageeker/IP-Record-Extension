@@ -90,3 +90,13 @@ export function parseCountry(input) {
 export function countryOptions() {
   return COUNTRY_CODES.map((c) => el("option", { value: `${c} ${countryName(c)}` }));
 }
+
+/** 「常用：🇯🇵 日本 8/10 次 · IP 1.2.3.4 5 次」；只有一次使用时返回空串 */
+export function statsText(st) {
+  if (!st || st.total < 2) return "";
+  const c = st.countries[0], i = st.ips[0];
+  const parts = [];
+  if (c) parts.push(`${flag(c.value)} ${countryName(c.value)} ${c.count}/${st.total} 次`);
+  if (i) parts.push(`IP ${i.value} ${i.count} 次`);
+  return `最常用：${parts.join(" · ")}`;
+}

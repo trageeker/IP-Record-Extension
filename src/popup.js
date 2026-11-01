@@ -1,6 +1,6 @@
 import { hostnameOf, siteOf } from "./lib/domain.js";
-import { getRecords, getSettings, updateRecord, addManual, search, byRecent } from "./lib/store.js";
-import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions } from "./lib/ui.js";
+import { getRecords, getSettings, updateRecord, addManual, search, byRecent, siteStats } from "./lib/store.js";
+import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions, statsText } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { tab: null, host: null, site: null, record: null, prevLast: null, records: [], detecting: false };
@@ -109,7 +109,14 @@ async function runDetect(save) {
         : `IP 变了，国家相同：上次 ${prev.ip}（${ago(prev.lastSeenAt || prev.createdAt)}）`);
       if (prev.note) warns.push(`上次备注：${prev.note}`);
     }
-    if (c.mixed) warns.push("各源看到的 IP 不完全一致（可能是分流代理或 IPv4/IPv6 混用），可展开「各 IP 源结果」查看。");
+    const generic = detection.sources.filter((x) => x.ok && x.id !== "site");
+    const gTop = [...generic.reduce((m, x) => m.set(x.ip, (m.get(x.ip) || 0) + 1), new Map())].sort((a, b) => b[1] - a[1])[0];
+    if (c.via === "site" && gTop && gTop[0] !== c.ip) {
+      const g = generic.find((x) => x.ip === gTop[0]);
+      warns.push(`ℹ 这个网站看到的是 ${c.ip}（${countryName(c.country)}），而通用 IP 源看到的是 ${gTop[0]}（${countryName(g?.country)}）。说明代理按域名分流：这个网站走的线路和你切换的不是同一个，以网站看到的为准。`);
+    } else if (c.mixed) {
+      warns.push("各源看到的 IP 不完全一致（可能是分流代理或 IPv4/IPv6 混用），可展开「各 IP 源结果」查看。");
+    }
     showWarn(warns);
 
     if (saved) {
@@ -174,6 +181,9 @@ const saveNote = debounce(async () => {
 async function loadRecords() {
   state.records = await getRecords();
   renderList();
+  const t = state.site ? statsText(siteStats(state.records, state.site)) : "";
+  $("cur-stats").textContent = t;
+  $("cur-stats").classList.toggle("hidden", !t);
 }
 
 function recItem(r) {

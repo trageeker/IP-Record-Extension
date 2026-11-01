@@ -111,3 +111,19 @@ test("manual entry + validation", async () => {
   assert.equal(parseCountry(""), "");
   assert.equal(parseCountry("火星"), null);
 });
+
+test("siteStats most used ip/country", async () => {
+  const { statsText } = await import("../src/lib/ui.js");
+  const recs = [
+    { site: "a.com", ip: "1.1.1.1", country: "JP", seen: 5 },
+    { site: "a.com", ip: "2.2.2.2", country: "JP", seen: 2 },
+    { site: "a.com", ip: "3.3.3.3", country: "US", seen: 4 },
+    { site: "b.com", ip: "9.9.9.9", country: "US", seen: 9 },
+  ];
+  const st = store.siteStats(recs, "a.com");
+  assert.equal(st.total, 11);
+  assert.deepEqual(st.countries[0], { value: "JP", count: 7 });
+  assert.deepEqual(st.ips[0], { value: "1.1.1.1", count: 5 });
+  assert.match(statsText(st), /日本 7\/11 次 · IP 1\.1\.1\.1 5 次/);
+  assert.equal(statsText(store.siteStats([{ site: "c.com", ip: "1.1.1.1", seen: 1 }], "c.com")), "");
+});
