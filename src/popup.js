@@ -1,6 +1,6 @@
 import { hostnameOf, siteOf } from "./lib/domain.js";
 import { getRecords, getSettings, updateRecord, addManual, search, byRecent, siteStats, chooseSource } from "./lib/store.js";
-import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions, statsText, showIp, version } from "./lib/ui.js";
+import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions, statsText, showIp, version, ipEl } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 const state = { tab: null, host: null, site: null, record: null, merged: false, prevLast: null, records: [], detecting: false };
@@ -18,7 +18,7 @@ function ipBlock(c, tag) {
     tag ? el("span", { class: "last-tag" }, tag) : null,
     el("span", { class: "flag" }, flag(c.country)),
     el("span", { class: "cc" }, c.country ? `${c.country} · ${countryName(c.country)}` : "国家未知"),
-    el("span", { class: "ip", title: "点击选中" }, showIp(c.ip)),
+    ipEl(c.ip, "ip"),
   ].filter(Boolean);
 }
 
@@ -224,7 +224,7 @@ function recItem(r) {
     el("div", { class: "top" },
       el("span", { class: "flag" }, flag(r.country)),
       el("span", { class: "site", title: r.host }, r.site),
-      el("span", { class: "mono" }, showIp(r.ip)),
+      el("span", {}, ipEl(r.ip)),
     ),
     el("div", { class: "meta" },
       el("span", {}, r.country ? countryName(r.country) : "国家未知"),

@@ -3,7 +3,7 @@ import {
   getRecords, getSettings, saveSettings, updateRecord, deleteRecord, clearAll,
   search, byRecent, siteStats, exportJson, exportCsv, importText,
 } from "./lib/store.js";
-import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText, showIp, version } from "./lib/ui.js";
+import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText, showIp, version, ipEl } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 let records = [];
@@ -61,7 +61,7 @@ function row(r) {
       statsText(siteStats(records, r.site)) ? el("div", { class: "sub stats-line" }, statsText(siteStats(records, r.site))) : null,
     ),
     el("td", { title: srcTitle || null },
-      el("div", { class: "ip" }, showIp(r.ip)),
+      el("div", {}, ipEl(r.ip, "ip")),
       el("div", { class: "sub" }, `${flag(r.country)} ${r.country || "?"} ${countryName(r.country)}`),
       el("div", { class: "sub" }, [r.city, r.org].filter(Boolean).join(" · ")),
       el("div", { class: "sub faint via" }, r.via === "manual" ? "手动填写" : r.via === "source" ? `以 ${r.viaName} 为准` : r.via === "site" ? "站点自身看到的 IP" : r.total ? `${r.agree}/${r.total} 源一致` : "导入"),

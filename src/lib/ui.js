@@ -104,3 +104,9 @@ export function statsText(st) {
 /** 显示用 IP：手动记录没填 IP 时显示「未填 IP」 */
 export const showIp = (ip) => (!ip || ip === "0.0.0.0" ? "未填 IP" : ip);
 export const version = () => `v${globalThis.chrome?.runtime?.getManifest?.().version || ""}`;
+
+/** IP 元素：未填 IP 时是橙色标签 */
+export function ipEl(ip, cls = "mono") {
+  const none = !ip || ip === "0.0.0.0";
+  return el("span", { class: none ? `${cls} noip` : cls, title: none ? "手动记录时没填 IP" : null }, showIp(ip));
+}

@@ -50,12 +50,15 @@ textarea.input { height: auto; min-height: 58px; padding: 8px 10px; resize: vert
 .toast.show { opacity: .94; }
 
 /* 记录条目（弹窗和管理页通用） */
-.rec { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 10px; border-radius: 8px; }
+.rec { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; padding: 9px 10px; border-radius: 8px; }
 .rec + .rec { border-top: 1px solid var(--line); border-radius: 0; }
 .rec:hover { background: var(--bg2); }
-.rec .top { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.rec .top { display: grid; grid-template-columns: 18px minmax(0, 118px) minmax(0, 1fr); align-items: center; gap: 6px; min-width: 0; }
 .rec .site { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rec .meta { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 10px; color: var(--fg2); font-size: 12px; }
 .rec .note { grid-column: 1 / -1; color: var(--fg); font-size: 12.5px; white-space: pre-wrap; word-break: break-word; }
 .rec .note:empty { display: none; }
 .rec .actions { grid-row: 1 / span 2; grid-column: 2; display: flex; align-items: center; gap: 4px; }
+.noip { display: inline-block; font-family: var(--sans, inherit) !important; font-weight: 600; font-size: 0.85em; color: #9a3412; background: #ffedd5; border: 1px solid #fb923c; border-radius: 4px; padding: 0 6px; line-height: 1.5; white-space: nowrap; }
+.rec .top > :last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rec .top > :last-child .mono { font-size: 12.5px; }
