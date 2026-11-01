@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>站点 IP 记录 · 管理</title>
+  <link rel="icon" href="icons/app-32.png">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <img src="icons/app-48.png" alt="" width="28" height="28">
+      <h1>站点 IP 记录</h1>
+      <nav>
+        <button class="tab active" data-tab="records">记录</button>
+        <button class="tab" data-tab="io">导入 / 导出</button>
+        <button class="tab" data-tab="settings">设置</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="tab-records" class="panel">
+      <div class="toolbar">
+        <input id="q" class="input" placeholder="搜索站点 / IP / 国家 / 备注，如 abc.com" autocomplete="off" spellcheck="false" autofocus>
+        <select id="country" class="input narrow" title="按国家筛选"><option value="">全部国家</option></select>
+        <label class="check"><input type="checkbox" id="latest-only"> 每个站点只看最近一条</label>
+      </div>
+      <div id="stats" class="muted small"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:22%">站点</th>
+              <th style="width:20%">IP / 国家</th>
+              <th>备注</th>
+              <th style="width:13%">最近使用</th>
+              <th style="width:150px"></th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div id="empty" class="empty hidden">没有记录。打开一个网站，点工具栏里的插件图标就会记录。</div>
+      </div>
+    </section>
+
+    <section id="tab-io" class="panel hidden">
+      <div class="block">
+        <h2>导出</h2>
+        <p class="muted">JSON 可以完整导入回来（含各源明细）；CSV 方便用表格软件查看。</p>
+        <div class="row">
+          <button id="export-json" class="btn primary">导出 JSON</button>
+          <button id="export-csv" class="btn">导出 CSV</button>
+        </div>
+      </div>
+      <div class="block">
+        <h2>导入</h2>
+        <p class="muted">支持本插件导出的 JSON 或 CSV。合并模式下同一条记录（相同 ID）保留较新的版本。</p>
+        <div class="row">
+          <label class="check"><input type="radio" name="import-mode" value="merge" checked> 合并到现有记录</label>
+          <label class="check"><input type="radio" name="import-mode" value="replace"> 覆盖全部现有记录</label>
+        </div>
+        <div class="row">
+          <input id="import-file" type="file" accept=".json,.csv,application/json,text/csv" class="hidden">
+          <button id="import-btn" class="btn">选择文件导入…</button>
+          <span id="import-result" class="muted"></span>
+        </div>
+      </div>
+      <div class="block danger-zone">
+        <h2>清空</h2>
+        <p class="muted">删除全部记录，无法撤销。建议先导出备份。</p>
+        <button id="clear-all" class="btn danger">清空全部记录</button>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="panel hidden">
+      <div class="block">
+        <h2>记录方式</h2>
+        <label class="check"><input type="checkbox" id="s-autoRecord"> 点击插件图标时自动检测并记录（关闭后需点弹窗里的 ↻）</label>
+        <label class="check"><input type="checkbox" id="s-mergeSameIp"> 同一站点再次用同一个 IP 时只更新「最近使用」，不新增记录</label>
+        <label class="check"><input type="checkbox" id="s-useSiteTrace"> 网站在 Cloudflare 后面时，以它自己看到的 IP 为准（请求 /cdn-cgi/trace，分流代理时更准）</label>
+      </div>
+      <div class="block">
+        <h2>IP 源</h2>
+        <p class="muted">同时查询勾选的源，按多数票得出 IP 和国家。至少保留两个。</p>
+        <div id="sources" class="sources-grid"></div>
+        <label class="field">超时（毫秒）<input id="s-timeout" type="number" min="1500" max="20000" step="500" class="input narrow"></label>
+        <div class="row"><button id="test-sources" class="btn">测试全部源</button><span id="test-state" class="muted"></span></div>
+        <ul id="test-result" class="test-result"></ul>
+      </div>
+      <div class="block">
+        <h2>快捷键</h2>
+        <p class="muted">默认 Alt+Shift+I 打开弹窗，可在 <span class="mono">chrome://extensions/shortcuts</span> 修改。</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

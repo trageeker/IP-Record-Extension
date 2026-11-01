@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Site IP Recorder · 站点 IP 记录",
+  "short_name": "Site IP",
+  "version": "1.0.0",
+  "description": "记录访问每个网站时用的出口 IP 和国家（多源投票），可加备注、搜索、导入导出，换 IP 前不再忘。",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "unlimitedStorage", "tabs"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": {
+    "default_title": "站点 IP 记录",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/none-16.png",
+      "32": "icons/none-32.png",
+      "48": "icons/none-48.png",
+      "128": "icons/none-128.png"
+    }
+  },
+  "options_ui": { "page": "options.html", "open_in_tab": true },
+  "icons": {
+    "16": "icons/app-16.png",
+    "32": "icons/app-32.png",
+    "48": "icons/app-48.png",
+    "128": "icons/app-128.png"
+  },
+  "commands": {
+    "_execute_action": { "suggested_key": { "default": "Alt+Shift+I" } }
+  }
+}

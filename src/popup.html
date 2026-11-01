@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>站点 IP 记录</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="bar">
+    <img src="icons/app-32.png" alt="" width="20" height="20">
+    <strong>站点 IP 记录</strong>
+    <span class="grow"></span>
+    <button id="redetect" class="icon-btn" title="重新检测并记录">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+    </button>
+    <button id="open-options" class="icon-btn" title="打开管理页（搜索、编辑、导入导出、设置）">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </header>
+
+  <section id="current" class="card">
+    <div class="row">
+      <span id="cur-site" class="site-name">—</span>
+      <span id="cur-status" class="chip">检测中</span>
+    </div>
+    <div id="cur-ip" class="ip-line"><span class="spinner"></span><span class="muted">正在向多个 IP 源查询…</span></div>
+    <div id="cur-detail" class="muted small"></div>
+    <div id="cur-warn" class="warn-box hidden"></div>
+    <details id="cur-sources" class="sources hidden"><summary>各 IP 源结果</summary><ul></ul></details>
+  </section>
+
+  <section id="note-box" class="card hidden">
+    <label for="note" class="label">备注 <span class="faint">（自动保存）</span></label>
+    <textarea id="note" class="input" rows="2" placeholder="例如：注册用的日本节点；不能用美国 IP"></textarea>
+    <div class="row end">
+      <span id="note-state" class="faint small"></span>
+      <button id="note-save" class="btn primary small">保存备注</button>
+    </div>
+  </section>
+
+  <section class="card search">
+    <input id="q" class="input" placeholder="搜索站点 / IP / 国家 / 备注，如 abc.com" autocomplete="off" spellcheck="false">
+    <div id="list-title" class="label list-title">此站点的记录</div>
+    <div id="list"></div>
+  </section>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
