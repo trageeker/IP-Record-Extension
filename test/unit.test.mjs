@@ -89,3 +89,25 @@ test("store: record, merge, search, export/import", async () => {
   r = await store.importText(JSON.stringify([{ host: "", ip: "" }, { host: "ok.com", ip: "5.5.5.5" }]));
   assert.equal(r.added, 1); assert.equal(r.skipped, 1);
 });
+
+test("manual entry + validation", async () => {
+  const { parseCountry } = await import("../src/lib/ui.js");
+  store._setStorage(mem());
+  assert.equal(store.isIp("1.2.3.4"), true);
+  assert.equal(store.isIp("256.1.1.1"), false);
+  assert.equal(store.isIp("2001:db8::1"), true);
+  assert.equal(store.isIp("abc"), false);
+  const r = await store.addManual({ url: "https://www.foo.com/", host: "www.foo.com", ip: " 203.0.113.5 ", country: "jp" });
+  assert.equal(r.site, "foo.com"); assert.equal(r.ip, "203.0.113.5"); assert.equal(r.country, "JP"); assert.equal(r.via, "manual");
+  await assert.rejects(store.addManual({ host: "foo.com", ip: "x" }));
+  await assert.rejects(store.addManual({ host: "foo.com", ip: "1.1.1.1", country: "Japan" }));
+  await assert.rejects(store.updateRecord(r.id, { ip: "nope" }));
+  await store.updateRecord(r.id, { ip: "198.51.100.7", country: "us" });
+  const [x] = await store.getRecords();
+  assert.equal(x.ip, "198.51.100.7"); assert.equal(x.country, "US");
+  assert.equal(parseCountry("JP 日本"), "JP");
+  assert.equal(parseCountry("jp"), "JP");
+  assert.equal(parseCountry("日本"), "JP");
+  assert.equal(parseCountry(""), "");
+  assert.equal(parseCountry("火星"), null);
+});

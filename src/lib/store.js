@@ -5,7 +5,8 @@ import { siteOf, normalizeQuery } from "./domain.js";
 import { DEFAULT_SOURCE_IDS } from "./ip.js";
 
 export const DEFAULT_SETTINGS = {
-  autoRecord: true, // 打开弹窗即检测并记录
+  autoRecord: true, // 打开弹窗时，没有记录的网站自动检测并记录（已有记录的网站只在手动点「获取当前 IP」时请求）
+  resetConnections: true, // 检测前关闭浏览器已有的连接，避免切换节点后仍走旧节点
   mergeSameIp: true, // 同一站点同一 IP 再次记录时只更新「最近使用」，不新增
   useSiteTrace: true,
   sourceIds: DEFAULT_SOURCE_IDS,
@@ -77,6 +78,29 @@ export async function addDetection({ url, host, detection }, settings) {
   return { record: rec, merged: false };
 }
 
+/** 手动填写（所有 IP 源都失败时，或想自己指定） */
+export async function addManual({ url, host, ip, country, note }) {
+  ip = String(ip || "").trim();
+  if (!isIp(ip)) throw new Error("IP 格式不对");
+  country = String(country || "").trim().toUpperCase();
+  if (country && !/^[A-Z]{2}$/.test(country)) throw new Error("国家请填两位代码，如 JP、US");
+  const now = Date.now();
+  const records = await getRecords();
+  const rec = {
+    id: uid(), site: siteOf(host), host, url, ip, country, city: "", region: "", org: "",
+    via: "manual", agree: 0, total: 0, mixed: false, sources: [], note: note || "",
+    createdAt: now, lastSeenAt: now, seen: 1, updatedAt: now,
+  };
+  records.push(rec);
+  await putRecords(records);
+  return rec;
+}
+
+export function isIp(s) {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) return s.split(".").every((n) => Number(n) <= 255);
+  return /^[0-9a-f:]+$/i.test(s) && s.includes(":") && s.length >= 3;
+}
+
 function slimSources(sources) {
   return (sources || []).map((s) => (s.ok
     ? { id: s.id, name: s.name, ok: true, ip: s.ip, country: s.country || "" }
@@ -88,7 +112,17 @@ export async function updateRecord(id, patch) {
   const r = records.find((x) => x.id === id);
   if (!r) return null;
   const allowed = {};
-  for (const k of ["note", "country", "ip"]) if (k in patch) allowed[k] = patch[k];
+  if ("note" in patch) allowed.note = String(patch.note ?? "");
+  if ("ip" in patch) {
+    const ip = String(patch.ip || "").trim();
+    if (!isIp(ip)) throw new Error("IP 格式不对");
+    allowed.ip = ip;
+  }
+  if ("country" in patch) {
+    const cc = String(patch.country || "").trim().toUpperCase();
+    if (cc && !/^[A-Z]{2}$/.test(cc)) throw new Error("国家请填两位代码，如 JP、US");
+    allowed.country = cc;
+  }
   Object.assign(r, allowed, { updatedAt: Date.now() });
   await putRecords(records);
   return r;

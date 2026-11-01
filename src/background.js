@@ -1,6 +1,6 @@
 // 后台：检测 + 记录（弹窗关掉也会完成），并按当前标签页是否有记录切换图标和角标。
 
-import { detect } from "./lib/ip.js";
+import { detect, SOURCE_ORIGINS } from "./lib/ip.js";
 import { addDetection, getRecords, getSettings, byRecent } from "./lib/store.js";
 import { hostnameOf, siteOf } from "./lib/domain.js";
 
@@ -43,17 +43,32 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.runtime.onInstalled.addListener(refreshAllTabs);
 chrome.runtime.onStartup.addListener(refreshAllTabs);
 
+/**
+ * 切换代理节点后，Chrome 仍会复用之前建立的连接（连接还挂在旧节点上），所以查到的还是旧 IP。
+ * 清除 Cookie 时 Chrome 会顺带关闭所有已建立的连接；这里只清 IP 源网站的 Cookie
+ *（不碰你正在访问的网站），借此让下一次请求重新建连、走当前节点。
+ */
+async function resetConnections() {
+  try {
+    await chrome.browsingData.remove({ origins: SOURCE_ORIGINS }, { cookies: true });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   (async () => {
     if (msg?.type === "detect") {
       const settings = await getSettings();
       const host = hostnameOf(msg.url || "");
+      const reset = settings.resetConnections ? await resetConnections() : false;
       const detection = await detect(host, {
         sourceIds: settings.sourceIds, timeout: settings.timeout, useSiteTrace: settings.useSiteTrace && !!host,
       });
       let saved = null;
       if (msg.save && host) saved = await addDetection({ url: msg.url, host, detection }, settings);
-      return { ok: true, detection, saved };
+      return { ok: true, detection, saved, reset };
     }
     if (msg?.type === "refreshIcons") { await refreshAllTabs(); return { ok: true }; }
     return { ok: false, error: "unknown message" };

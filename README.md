@@ -44,3 +44,7 @@ npm run build     # 打包 dist/ip-record-extension-v<版本>.zip
 `test/e2e.mjs` 是真实 Chromium 端到端测试（需要 Playwright：`PLAYWRIGHT_DIR=<含 playwright 的 node_modules> node test/e2e.mjs`）。图标由 `scripts/make_icons.py` 生成。
 
 推送 `v*` 标签会由 GitHub Actions 自动测试、打包并发布 Release。
+
+## 切换节点后 IP 不变？
+
+Chrome 会复用已经建立的连接，代理软件里切换节点后，这些旧连接仍走旧节点，所以网页（例如 ippure.com）和插件查到的都还是旧 IP；清除 Cookie 之所以有效，是因为 Chrome 清 Cookie 时会关闭所有已建立的连接。插件每次检测前都会只清除各 IP 源网站的 Cookie 来触发这一点（不会清你正在访问的网站），所以需要 `browsingData` 权限。代价是当时正在进行中的下载或请求可能被中断，可在设置里关闭「检测前重置浏览器连接」。

@@ -3,7 +3,7 @@ import {
   getRecords, getSettings, saveSettings, updateRecord, deleteRecord, clearAll,
   search, byRecent, exportJson, exportCsv, importText,
 } from "./lib/store.js";
-import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce } from "./lib/ui.js";
+import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 let records = [];
@@ -63,7 +63,7 @@ function row(r) {
       el("div", { class: "ip" }, r.ip),
       el("div", { class: "sub" }, `${flag(r.country)} ${r.country || "?"} ${countryName(r.country)}`),
       el("div", { class: "sub" }, [r.city, r.org].filter(Boolean).join(" · ")),
-      el("div", { class: "sub faint via" }, r.via === "site" ? "站点自身看到的 IP" : r.total ? `${r.agree}/${r.total} 源一致` : "导入"),
+      el("div", { class: "sub faint via" }, r.via === "manual" ? "手动填写" : r.via === "site" ? "站点自身看到的 IP" : r.total ? `${r.agree}/${r.total} 源一致` : "导入"),
     ),
     el("td", { class: "note" }, note),
     el("td", { title: `首次：${fmtDate(r.createdAt)}\n最近：${fmtDate(r.lastSeenAt)}` },
@@ -72,6 +72,18 @@ function row(r) {
     ),
     el("td", { class: "acts" },
       el("button", { class: "btn small", onclick: async () => { await navigator.clipboard.writeText(r.ip); toast("已复制 IP"); } }, "复制"),
+      el("button", {
+        class: "btn small", title: "修改 IP 和国家",
+        onclick: async () => {
+          const ip = prompt("IP", r.ip);
+          if (ip == null) return;
+          const ccIn = prompt("国家（两位代码，如 JP；或中文名）", r.country || "");
+          if (ccIn == null) return;
+          const cc = parseCountry(ccIn);
+          if (cc === null) return toast("国家没认出来");
+          try { await updateRecord(r.id, { ip, country: cc }); toast("已修改"); load(); } catch (e) { toast(e.message); }
+        },
+      }, "改"),
       el("button", { class: "btn small primary", onclick: () => chrome.tabs.create({ url: siteUrl(r) }) }, "跳转"),
       el("button", {
         class: "btn small danger", title: "删除",
@@ -138,7 +150,7 @@ $("clear-all").addEventListener("click", async () => {
 // ------------------------------------------------------------------ settings
 async function initSettings() {
   const s = await getSettings();
-  for (const k of ["autoRecord", "mergeSameIp", "useSiteTrace"]) {
+  for (const k of ["autoRecord", "resetConnections", "mergeSameIp", "useSiteTrace"]) {
     const box = $(`s-${k}`);
     box.checked = !!s[k];
     box.addEventListener("change", async () => { await saveSettings({ [k]: box.checked }); toast("已保存"); });
