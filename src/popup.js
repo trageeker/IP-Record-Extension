@@ -1,9 +1,9 @@
 import { hostnameOf, siteOf } from "./lib/domain.js";
-import { getRecords, getSettings, updateRecord, addManual, search, byRecent, siteStats } from "./lib/store.js";
-import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions, statsText } from "./lib/ui.js";
+import { getRecords, getSettings, updateRecord, addManual, search, byRecent, siteStats, chooseSource } from "./lib/store.js";
+import { countryName, flag, ago, el, siteUrl, debounce, parseCountry, countryOptions, statsText, showIp, version } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
-const state = { tab: null, host: null, site: null, record: null, prevLast: null, records: [], detecting: false };
+const state = { tab: null, host: null, site: null, record: null, merged: false, prevLast: null, records: [], detecting: false };
 
 function toast(msg) {
   const t = $("toast");
@@ -18,18 +18,25 @@ function ipBlock(c, tag) {
     tag ? el("span", { class: "last-tag" }, tag) : null,
     el("span", { class: "flag" }, flag(c.country)),
     el("span", { class: "cc" }, c.country ? `${c.country} · ${countryName(c.country)}` : "国家未知"),
-    el("span", { class: "ip", title: "点击选中" }, c.ip),
+    el("span", { class: "ip", title: "点击选中" }, showIp(c.ip)),
   ].filter(Boolean);
 }
 
 function renderSources(sources) {
   const box = $("cur-sources");
   if (!sources?.length) return box.classList.add("hidden");
-  box.querySelector("ul").replaceChildren(...sources.map((s) => el("li", {},
-    `${s.name}：`,
-    s.ok ? el("span", { class: "mono" }, `${s.ip} ${s.country || "?"}`) : el("span", { class: "err" }, s.error),
-    s.ms != null ? el("span", { class: "faint" }, `  ${s.ms}ms`) : null,
-  )));
+  const rec = state.record;
+  box.querySelector("ul").replaceChildren(...sources.map((s) => {
+    const using = rec && s.ok && rec.ip === s.ip && (rec.via === "site" ? s.id === "site" : rec.via === "source" ? rec.viaName === s.name : false);
+    return el("li", { class: "src-row" },
+      `${s.name}：`,
+      s.ok ? el("span", { class: "mono" }, `${s.ip} ${s.country || "?"}`) : el("span", { class: "err" }, s.error),
+      s.ms != null ? el("span", { class: "faint" }, `  ${s.ms}ms`) : null,
+      rec && s.ok && state.site
+        ? el("button", { class: `btn small use${using ? " on" : ""}`, title: "这次以这个源的结果为准", onclick: () => useSource(s, sources) }, using ? "已采用" : "用这个")
+        : null,
+    );
+  }));
   box.classList.remove("hidden");
 }
 
@@ -46,8 +53,29 @@ function showWarn(lines) {
   w.classList.remove("hidden");
 }
 
+async function useSource(src, sources) {
+  try {
+    const res = await chooseSource({ recordId: state.record.id, merged: state.merged, source: src });
+    state.merged = res.merged;
+    const r = res.record;
+    $("cur-ip").replaceChildren(...ipBlock(r));
+    const bits = [r.city, r.region, r.org].filter(Boolean).join(" · ");
+    $("cur-detail").textContent = [bits, viaText(r)].filter(Boolean).join("　");
+    setStatus(res.merged ? `已改用 ${src.name} · 并入已有记录` : `已改用 ${src.name}`, "ok");
+    bindNote(r, "备注");
+    await loadRecords();
+    state.prevLast = r;
+    renderSources(sources);
+    $("cur-sources").open = true;
+    toast(`已以 ${src.name} 为准`);
+  } catch (e) {
+    toast(String(e.message || e));
+  }
+}
+
 function viaText(r) {
   if (r.via === "manual") return "手动填写";
+  if (r.via === "source") return `以 ${r.viaName} 为准`;
   if (r.via === "site") return "以站点自身看到的 IP 为准";
   return r.total ? `${r.agree ?? r.agreeIp}/${r.total} 个源一致` : "";
 }
@@ -68,10 +96,11 @@ function showLast(last) {
   $("cur-detail").textContent = [ago(last.lastSeenAt || last.createdAt), bits, viaText(last)].filter(Boolean).join("　");
   const n = state.records.filter((r) => r.site === state.site).length;
   setStatus(`已有记录 · ${n} 条`, "ok");
+  bindNote(last, "上次记录的备注");
+  state.merged = false;
   renderSources(last.sources);
   $("cur-sources").open = false;
   $("fetch-now").classList.remove("hidden");
-  bindNote(last, "上次记录的备注");
 }
 
 async function runDetect(save) {
@@ -87,6 +116,8 @@ async function runDetect(save) {
     if (!res?.ok) throw new Error(res?.error || "检测失败");
     const { detection, saved } = res;
     const c = detection.result;
+    state.record = saved?.record || null;
+    state.merged = !!saved?.merged;
     renderSources(detection.sources);
     if (!c) {
       $("cur-ip").replaceChildren(el("span", { class: "muted" }, "所有 IP 源都失败了，可以手动填写"));
@@ -103,9 +134,9 @@ async function runDetect(save) {
 
     const warns = [];
     const prev = state.prevLast;
-    if (prev && prev.ip !== c.ip) {
+    if (prev && prev.ip !== c.ip && prev.ip !== "0.0.0.0") {
       warns.push(prev.country !== c.country
-        ? `⚠ 国家变了：上次用的是 ${flag(prev.country)} ${prev.country || "?"} ${countryName(prev.country)} · ${prev.ip}（${ago(prev.lastSeenAt || prev.createdAt)}）`
+        ? `⚠ 国家变了：上次用的是 ${flag(prev.country)} ${prev.country || "?"} ${countryName(prev.country)} · ${showIp(prev.ip)}（${ago(prev.lastSeenAt || prev.createdAt)}）`
         : `IP 变了，国家相同：上次 ${prev.ip}（${ago(prev.lastSeenAt || prev.createdAt)}）`);
       if (prev.note) warns.push(`上次备注：${prev.note}`);
     }
@@ -151,14 +182,16 @@ async function saveManual() {
   const cc = parseCountry($("m-country").value);
   if (cc === null) { $("m-err").textContent = "国家没认出来，请填两位代码如 JP"; return; }
   try {
-    const rec = await addManual({ url: state.tab?.url, host: state.host, ip: $("m-ip").value, country: cc, note: $("note").value && !state.record ? $("note").value : "" });
+    const rec = await addManual({ url: state.tab?.url, host: state.host, ip: $("m-ip").value, country: cc, note: $("m-note").value });
     $("manual-box").classList.add("hidden");
-    $("m-ip").value = ""; $("m-country").value = "";
+    $("m-ip").value = ""; $("m-country").value = ""; $("m-note").value = "";
     $("cur-ip").replaceChildren(...ipBlock(rec));
     $("cur-detail").textContent = "手动填写";
     showWarn([]);
     setStatus("已记录", "ok");
     bindNote(rec, "备注");
+    state.merged = false;
+    $("cur-sources").classList.add("hidden");
     $("note").focus();
     await loadRecords();
     state.prevLast = rec;
@@ -191,7 +224,7 @@ function recItem(r) {
     el("div", { class: "top" },
       el("span", { class: "flag" }, flag(r.country)),
       el("span", { class: "site", title: r.host }, r.site),
-      el("span", { class: "mono" }, r.ip),
+      el("span", { class: "mono" }, showIp(r.ip)),
     ),
     el("div", { class: "meta" },
       el("span", {}, r.country ? countryName(r.country) : "国家未知"),
@@ -203,7 +236,7 @@ function recItem(r) {
     el("div", { class: "actions" },
       el("button", {
         class: "btn small", title: "复制 IP",
-        onclick: async () => { await navigator.clipboard.writeText(r.ip); toast("已复制 IP"); },
+        onclick: async () => { if (r.ip === "0.0.0.0") return toast("这条没填 IP"); await navigator.clipboard.writeText(r.ip); toast("已复制 IP"); },
       }, "复制"),
       el("button", { class: "btn small primary", title: "打开此站点", onclick: () => chrome.tabs.create({ url: siteUrl(r) }) }, "跳转"),
     ),
@@ -244,6 +277,7 @@ function openOptions() {
 
 // ------------------------------------------------------------------ init
 async function init() {
+  $("ver").textContent = version();
   // ?tabId= 仅供测试：把弹窗页面当普通标签页打开时指定目标标签页
   const forced = Number(new URLSearchParams(location.search).get("tabId"));
   const [tab] = forced ? [await chrome.tabs.get(forced)] : await chrome.tabs.query({ active: true, currentWindow: true });

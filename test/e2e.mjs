@@ -74,6 +74,15 @@ try {
   await popup.click("#fetch-now");
   await waitFor(popup, () => /已记录过/.test(document.querySelector("#cur-status").textContent));
   ok(true, "手动点「获取当前 IP」后才检测并合并");
+  ok(/^v\d+\.\d+\.\d+$/.test(await popup.$eval("#ver", (n) => n.textContent)), "弹窗显示版本号");
+  // 单独选某个源：点 ipinfo 那一行的「用这个」
+  await popup.$eval("#cur-sources", (d) => (d.open = true));
+  const useBtns = await popup.$$("#cur-sources li button.use");
+  ok(useBtns.length >= 3, `每个成功的源都有「用这个」按钮（${useBtns.length} 个）`);
+  await popup.click("#cur-sources li:nth-child(3) button.use");
+  await waitFor(popup, () => /已改用/.test(document.querySelector("#cur-status").textContent));
+  recs = await sw.evaluate(async () => (await chrome.storage.local.get("records")).records);
+  ok(recs.some((r) => r.via === "source" && r.viaName), "改用单个源后记录标为「以 X 为准」");
   await popup.screenshot({ path: `${shots}/popup-recorded.png`, fullPage: true });
   // 构造一条日本记录用于提醒和搜索
   await sw.evaluate(async () => {
@@ -111,15 +120,20 @@ try {
   await popup.fill("#m-country", "JP 日本");
   await popup.click("#m-save");
   ok(/IP 格式不对/.test(await popup.$eval("#m-err", (n) => n.textContent)), "手动填写校验 IP");
-  await popup.fill("#m-ip", "203.0.113.77");
+  await popup.fill("#m-ip", "");
+  await popup.fill("#m-country", "");
+  await popup.click("#m-save");
+  ok(/至少填一项/.test(await popup.$eval("#m-err", (n) => n.textContent)), "手动填写全空时提示");
+  await popup.fill("#m-country", "JP 日本");
+  await popup.fill("#m-note", "手动记的");
   await popup.click("#m-save");
   await waitFor(popup, () => /已记录/.test(document.querySelector("#cur-status").textContent));
-  await popup.fill("#note", "手动记的");
   await sleep(700);
   await popup.screenshot({ path: `${shots}/popup-manual.png`, fullPage: true });
   recs = await sw.evaluate(async () => (await chrome.storage.local.get("records")).records);
   const man = recs.find((r) => r.site === "example.org");
-  ok(man && man.ip === "203.0.113.77" && man.country === "JP" && man.via === "manual" && man.note === "手动记的", "手动填写保存");
+  ok(man && man.ip === "0.0.0.0" && man.country === "JP" && man.via === "manual" && man.note === "手动记的", "手动填写只填国家和备注");
+  ok(/未填 IP/.test(await popup.$eval("#cur-ip", (n) => n.textContent)), "未填 IP 显示为「未填 IP」");
   await popup.close();
   await sw.evaluate(() => chrome.storage.local.set({ settings: {} }));
 

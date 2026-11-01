@@ -64,7 +64,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
       const host = hostnameOf(msg.url || "");
       const reset = settings.resetConnections ? await resetConnections() : false;
       const detection = await detect(host, {
-        sourceIds: settings.sourceIds, timeout: settings.timeout, useSiteTrace: settings.useSiteTrace && !!host,
+        sourceIds: settings.sourceIds, timeout: settings.timeout, useSiteTrace: settings.useSiteTrace && !!host, prefer: settings.prefer,
       });
       let saved = null;
       if (msg.save && host) saved = await addDetection({ url: msg.url, host, detection }, settings);

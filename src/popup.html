@@ -10,6 +10,7 @@
   <header class="bar">
     <img src="icons/app-32.png" alt="" width="20" height="20">
     <strong>站点 IP 记录</strong>
+    <span id="ver" class="ver"></span>
     <span class="grow"></span>
     <button id="redetect" class="icon-btn" title="获取当前 IP 并记录">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
@@ -36,11 +37,13 @@
   </section>
 
   <section id="manual-box" class="card hidden">
-    <div class="label">手动填写本次使用的 IP</div>
+    <div class="label">手动填写（IP、国家、备注至少填一项）</div>
     <div class="manual-grid">
       <input id="m-ip" class="input mono" placeholder="IP，如 203.0.113.9" autocomplete="off" spellcheck="false">
       <input id="m-country" class="input" placeholder="国家，如 JP 或 日本" list="countries" autocomplete="off">
     </div>
+    <textarea id="m-note" class="input m-note" rows="2" placeholder="备注（可选）"></textarea>
+    <div class="faint small">IP 可留空，记录里会显示为「未填 IP」。</div>
     <datalist id="countries"></datalist>
     <div class="row end">
       <span id="m-err" class="err small"></span>

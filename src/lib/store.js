@@ -1,4 +1,6 @@
 // 记录存放在 chrome.storage.local（unlimitedStorage）。
+// 手动记录没填 IP 时用这个占位，界面上显示为「未填 IP」
+export const NO_IP = "0.0.0.0";
 // 记录：{ id, site, host, url, ip, country, city, region, org, via, agree, total, mixed, sources, note, createdAt, lastSeenAt, seen, updatedAt }
 
 import { siteOf, normalizeQuery } from "./domain.js";
@@ -10,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   mergeSameIp: true, // 同一站点同一 IP 再次记录时只更新「最近使用」，不新增
   useSiteTrace: true,
   sourceIds: DEFAULT_SOURCE_IDS,
+  prefer: "auto", // IP 不一致时以谁为准：auto | majority | site | 某个源 id
   timeout: 6000,
 };
 
@@ -45,7 +48,7 @@ export function siteStats(records, site) {
   const total = rs.reduce((n, r) => n + (r.seen || 1), 0);
   const top = (key) => {
     const m = new Map();
-    for (const r of rs) if (r[key]) m.set(r[key], (m.get(r[key]) || 0) + (r.seen || 1));
+    for (const r of rs) if (r[key] && r[key] !== NO_IP) m.set(r[key], (m.get(r[key]) || 0) + (r.seen || 1));
     return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([value, count]) => ({ value, count }));
   };
   return { total, records: rs.length, ips: top("ip"), countries: top("country") };
@@ -71,7 +74,7 @@ export async function addDetection({ url, host, detection }, settings) {
     if (same) {
       Object.assign(same, {
         host, url, country: c.country || same.country, city: c.city || same.city, region: c.region || same.region,
-        org: c.org || same.org, via: c.via, agree: c.agreeIp, total: c.total, mixed: !!c.mixed,
+        org: c.org || same.org, via: c.via, viaName: c.viaName || "", agree: c.agreeIp, total: c.total, mixed: !!c.mixed,
         sources: slimSources(detection.sources), lastSeenAt: now, seen: (same.seen || 1) + 1, updatedAt: now,
       });
       await putRecords(records);
@@ -81,7 +84,7 @@ export async function addDetection({ url, host, detection }, settings) {
   const rec = {
     id: uid(), site, host, url,
     ip: c.ip, country: c.country || "", city: c.city || "", region: c.region || "", org: c.org || "",
-    via: c.via, agree: c.agreeIp, total: c.total, mixed: !!c.mixed,
+    via: c.via, viaName: c.viaName || "", agree: c.agreeIp, total: c.total, mixed: !!c.mixed,
     sources: slimSources(detection.sources), note: "",
     createdAt: now, lastSeenAt: now, seen: 1, updatedAt: now,
   };
@@ -92,10 +95,11 @@ export async function addDetection({ url, host, detection }, settings) {
 
 /** 手动填写（所有 IP 源都失败时，或想自己指定） */
 export async function addManual({ url, host, ip, country, note }) {
-  ip = String(ip || "").trim();
+  ip = String(ip || "").trim() || NO_IP;
   if (!isIp(ip)) throw new Error("IP 格式不对");
   country = String(country || "").trim().toUpperCase();
   if (country && !/^[A-Z]{2}$/.test(country)) throw new Error("国家请填两位代码，如 JP、US");
+  if (ip === NO_IP && !country && !String(note || "").trim()) throw new Error("IP、国家、备注至少填一项");
   const now = Date.now();
   const records = await getRecords();
   const rec = {
@@ -113,9 +117,59 @@ export function isIp(s) {
   return /^[0-9a-f:]+$/i.test(s) && s.includes(":") && s.length >= 3;
 }
 
+/**
+ * 在一次检测之后，改为以某个 IP 源的结果为准。
+ * merged：这次检测是否合并进了已有记录（是的话先撤销那次合并的计数）。
+ */
+export async function chooseSource({ recordId, merged, source }, settings) {
+  settings = settings || (await getSettings());
+  const records = await getRecords();
+  const r = records.find((x) => x.id === recordId);
+  if (!r) throw new Error("记录不存在");
+  if (!source?.ip) throw new Error("这个源没有结果");
+  const now = Date.now();
+  const via = source.id === "site" ? "site" : "source";
+  const viaName = source.id === "site" ? "" : source.name;
+  const geo = {
+    country: source.country || "", city: source.city || "", region: source.region || "", org: source.org || "",
+    via, viaName, agree: (r.sources || []).filter((x) => x.ok && x.ip === source.ip).length, updatedAt: now,
+  };
+  if (r.ip === source.ip) {
+    Object.assign(r, geo);
+    await putRecords(records);
+    return { record: r, merged };
+  }
+  const other = settings.mergeSameIp
+    ? records.filter((x) => x.site === r.site && x.ip === source.ip && x.id !== r.id).sort(byRecent)[0]
+    : null;
+  if (merged) {
+    // 撤销合并：那条旧记录少算一次，另起（或并入）以所选源为准的记录
+    r.seen = Math.max(1, (r.seen || 1) - 1);
+    if (other) {
+      Object.assign(other, geo, { host: r.host, url: r.url, sources: r.sources, lastSeenAt: now, seen: (other.seen || 1) + 1 });
+      await putRecords(records);
+      return { record: other, merged: true };
+    }
+    const rec = { ...r, ...geo, id: uid(), ip: source.ip, note: "", createdAt: now, lastSeenAt: now, seen: 1 };
+    records.push(rec);
+    await putRecords(records);
+    return { record: rec, merged: false };
+  }
+  if (other) {
+    Object.assign(other, geo, { host: r.host, url: r.url, sources: r.sources, lastSeenAt: now, seen: (other.seen || 1) + 1 });
+    if (!other.note && r.note) other.note = r.note;
+    records.splice(records.indexOf(r), 1);
+    await putRecords(records);
+    return { record: other, merged: true };
+  }
+  Object.assign(r, geo, { ip: source.ip });
+  await putRecords(records);
+  return { record: r, merged: false };
+}
+
 function slimSources(sources) {
   return (sources || []).map((s) => (s.ok
-    ? { id: s.id, name: s.name, ok: true, ip: s.ip, country: s.country || "" }
+    ? { id: s.id, name: s.name, ok: true, ip: s.ip, country: s.country || "", city: s.city || "", region: s.region || "", org: s.org || "" }
     : { id: s.id, name: s.name, ok: false, error: s.error }));
 }
 
@@ -126,7 +180,7 @@ export async function updateRecord(id, patch) {
   const allowed = {};
   if ("note" in patch) allowed.note = String(patch.note ?? "");
   if ("ip" in patch) {
-    const ip = String(patch.ip || "").trim();
+    const ip = String(patch.ip || "").trim() || NO_IP;
     if (!isIp(ip)) throw new Error("IP 格式不对");
     allowed.ip = ip;
   }

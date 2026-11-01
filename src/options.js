@@ -3,7 +3,7 @@ import {
   getRecords, getSettings, saveSettings, updateRecord, deleteRecord, clearAll,
   search, byRecent, siteStats, exportJson, exportCsv, importText,
 } from "./lib/store.js";
-import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText } from "./lib/ui.js";
+import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText, showIp, version } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
 let records = [];
@@ -61,10 +61,10 @@ function row(r) {
       statsText(siteStats(records, r.site)) ? el("div", { class: "sub stats-line" }, statsText(siteStats(records, r.site))) : null,
     ),
     el("td", { title: srcTitle || null },
-      el("div", { class: "ip" }, r.ip),
+      el("div", { class: "ip" }, showIp(r.ip)),
       el("div", { class: "sub" }, `${flag(r.country)} ${r.country || "?"} ${countryName(r.country)}`),
       el("div", { class: "sub" }, [r.city, r.org].filter(Boolean).join(" · ")),
-      el("div", { class: "sub faint via" }, r.via === "manual" ? "手动填写" : r.via === "site" ? "站点自身看到的 IP" : r.total ? `${r.agree}/${r.total} 源一致` : "导入"),
+      el("div", { class: "sub faint via" }, r.via === "manual" ? "手动填写" : r.via === "source" ? `以 ${r.viaName} 为准` : r.via === "site" ? "站点自身看到的 IP" : r.total ? `${r.agree}/${r.total} 源一致` : "导入"),
     ),
     el("td", { class: "note" }, note),
     el("td", { title: `首次：${fmtDate(r.createdAt)}\n最近：${fmtDate(r.lastSeenAt)}` },
@@ -72,11 +72,11 @@ function row(r) {
       r.seen > 1 ? el("div", { class: "sub" }, `用过 ${r.seen} 次`) : null,
     ),
     el("td", { class: "acts" },
-      el("button", { class: "btn small", onclick: async () => { await navigator.clipboard.writeText(r.ip); toast("已复制 IP"); } }, "复制"),
+      el("button", { class: "btn small", onclick: async () => { if (r.ip === "0.0.0.0") return toast("这条没填 IP"); await navigator.clipboard.writeText(r.ip); toast("已复制 IP"); } }, "复制"),
       el("button", {
         class: "btn small", title: "修改 IP 和国家",
         onclick: async () => {
-          const ip = prompt("IP", r.ip);
+          const ip = prompt("IP（留空表示未填）", r.ip === "0.0.0.0" ? "" : r.ip);
           if (ip == null) return;
           const ccIn = prompt("国家（两位代码，如 JP；或中文名）", r.country || "");
           if (ccIn == null) return;
@@ -156,6 +156,15 @@ async function initSettings() {
     box.checked = !!s[k];
     box.addEventListener("change", async () => { await saveSettings({ [k]: box.checked }); toast("已保存"); });
   }
+  const pref = $("s-prefer");
+  pref.replaceChildren(
+    el("option", { value: "auto" }, "自动：网站自身优先，其次多数票"),
+    el("option", { value: "majority" }, "多数票"),
+    el("option", { value: "site" }, "网站自身（Cloudflare trace）"),
+    ...SOURCES.map((x) => el("option", { value: x.id }, x.name)),
+  );
+  pref.value = s.prefer || "auto";
+  pref.addEventListener("change", async () => { await saveSettings({ prefer: pref.value }); toast("已保存"); });
   $("s-timeout").value = s.timeout;
   $("s-timeout").addEventListener("change", async () => {
     const v = Math.min(20000, Math.max(1500, Number($("s-timeout").value) || 6000));
@@ -177,7 +186,8 @@ async function initSettings() {
   $("test-sources").addEventListener("click", async () => {
     $("test-state").replaceChildren(el("span", { class: "spinner" }));
     $("test-result").replaceChildren();
-    const d = await detect(null, { sourceIds: SOURCES.map((x) => x.id), timeout: (await getSettings()).timeout, useSiteTrace: false });
+    const st = await getSettings();
+    const d = await detect(null, { sourceIds: SOURCES.map((x) => x.id), timeout: st.timeout, useSiteTrace: false, prefer: st.prefer });
     $("test-state").textContent = d.result ? `结论：${flag(d.result.country)} ${d.result.country} ${d.result.ip}（${d.result.agreeIp}/${d.result.total} 一致）` : "全部失败";
     $("test-result").replaceChildren(...d.sources.map((x) => el("li", {},
       `${x.name}：`, x.ok ? el("span", { class: "mono" }, `${x.ip} ${x.country || "?"} · ${x.ms}ms`) : el("span", { class: "err" }, `${x.error} · ${x.ms}ms`))));
@@ -185,6 +195,7 @@ async function initSettings() {
 }
 
 // ------------------------------------------------------------------ init
+$("ver").textContent = version();
 const m = location.hash.match(/q=([^&]+)/);
 if (m) $("q").value = decodeURIComponent(m[1]);
 load();

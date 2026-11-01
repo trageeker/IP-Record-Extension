@@ -127,3 +127,57 @@ test("siteStats most used ip/country", async () => {
   assert.match(statsText(st), /日本 7\/11 次 · IP 1\.1\.1\.1 5 次/);
   assert.equal(statsText(store.siteStats([{ site: "c.com", ip: "1.1.1.1", seen: 1 }], "c.com")), "");
 });
+
+test("consensus prefer", async () => {
+  const { consensus } = await import("../src/lib/ip.js");
+  const rs = [
+    { id: "a", name: "A", ok: true, ip: "1.1.1.1", country: "US" },
+    { id: "b", name: "B", ok: true, ip: "1.1.1.1", country: "US" },
+    { id: "c", name: "C", ok: true, ip: "2.2.2.2", country: "JP", city: "Tokyo" },
+  ];
+  const site = { id: "site", name: "S", ok: true, ip: "3.3.3.3", country: "SG" };
+  assert.equal(consensus(rs, null).ip, "1.1.1.1");
+  assert.equal(consensus(rs, site).ip, "3.3.3.3");
+  assert.equal(consensus(rs, site, "majority").ip, "1.1.1.1");
+  const c = consensus(rs, site, "c");
+  assert.equal(c.ip, "2.2.2.2"); assert.equal(c.country, "JP"); assert.equal(c.via, "source"); assert.equal(c.viaName, "C"); assert.equal(c.city, "Tokyo");
+  assert.equal(consensus(rs, site, "zzz").ip, "3.3.3.3"); // 选的源不存在 → auto
+  assert.equal(consensus([...rs.slice(0, 2), { id: "c", ok: false }], null, "c").ip, "1.1.1.1"); // 选的源失败 → 多数
+});
+
+test("chooseSource + manual without ip", async () => {
+  store._setStorage(mem());
+  const srcs = [
+    { id: "a", name: "A", ok: true, ip: "1.1.1.1", country: "US" },
+    { id: "b", name: "B", ok: true, ip: "1.1.1.1", country: "US" },
+    { id: "c", name: "C", ok: true, ip: "2.2.2.2", country: "JP" },
+  ];
+  const { consensus } = await import("../src/lib/ip.js");
+  const det = { result: consensus(srcs, null), sources: srcs };
+  let s1 = await store.addDetection({ url: "https://x.com/", host: "x.com", detection: det });
+  // 新记录 → 原地改成 C
+  let r = await store.chooseSource({ recordId: s1.record.id, merged: s1.merged, source: srcs[2] });
+  assert.equal(r.record.ip, "2.2.2.2"); assert.equal(r.record.country, "JP"); assert.equal(r.record.via, "source");
+  assert.equal((await store.getRecords()).length, 1);
+  // 再测一次 1.1.1.1（新建），然后改用 C → 并入已有的 2.2.2.2 记录
+  s1 = await store.addDetection({ url: "https://x.com/", host: "x.com", detection: det });
+  assert.equal(s1.merged, false);
+  r = await store.chooseSource({ recordId: s1.record.id, merged: false, source: srcs[2] });
+  let all = await store.getRecords();
+  assert.equal(all.length, 1); assert.equal(all[0].seen, 2);
+  // 再测：这次多数票 2.2.2.2... 用一个合并场景：detection 合并进 2.2.2.2，然后改用 A
+  const det2 = { result: consensus(srcs, null, "c"), sources: srcs };
+  s1 = await store.addDetection({ url: "https://x.com/", host: "x.com", detection: det2 });
+  assert.equal(s1.merged, true); assert.equal(s1.record.seen, 3);
+  r = await store.chooseSource({ recordId: s1.record.id, merged: true, source: srcs[0] });
+  all = await store.getRecords();
+  assert.equal(all.length, 2);
+  assert.equal(all.find((x) => x.ip === "2.2.2.2").seen, 2);
+  assert.equal(all.find((x) => x.ip === "1.1.1.1").seen, 1);
+  // 手动：只填国家和备注
+  const m = await store.addManual({ host: "y.com", country: "JP", note: "只记国家" });
+  assert.equal(m.ip, store.NO_IP);
+  await assert.rejects(store.addManual({ host: "y.com" }));
+  const st = store.siteStats([m, { ...m, id: "2" }], "y.com");
+  assert.equal(st.ips.length, 0); assert.equal(st.countries[0].value, "JP");
+});

@@ -100,3 +100,7 @@ export function statsText(st) {
   if (i) parts.push(`IP ${i.value} ${i.count} 次`);
   return `最常用：${parts.join(" · ")}`;
 }
+
+/** 显示用 IP：手动记录没填 IP 时显示「未填 IP」 */
+export const showIp = (ip) => (!ip || ip === "0.0.0.0" ? "未填 IP" : ip);
+export const version = () => `v${globalThis.chrome?.runtime?.getManifest?.().version || ""}`;

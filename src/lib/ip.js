@@ -95,44 +95,53 @@ function tally(values) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]);
 }
 
-/** 汇总各源结果：站点自身的 trace 优先，否则取多数票。 */
-export function consensus(results, site) {
+/**
+ * 汇总各源结果。prefer：
+ *   "auto"     —— 网站自身 trace 优先，否则多数票（默认）
+ *   "majority" —— 纯多数票（网站自身 trace 也算一票）
+ *   某个源 id  —— 以该源为准（含 "site" 网站自身）；它失败时回退到 auto
+ */
+export function consensus(results, site, prefer = "auto") {
   const ok = results.filter((r) => r.ok);
   const all = site ? [site, ...ok] : ok;
   if (!all.length) return null;
 
-  const ipVotes = tally(ok.map((r) => r.ip));
-  const ccVotes = tally(ok.map((r) => r.country));
-  const ip = site?.ip || ipVotes[0]?.[0];
-  // 国家：先看站点 trace，再看投给该 IP 的源，最后看全体多数
+  let pick = null;
+  if (prefer && prefer !== "auto" && prefer !== "majority") pick = all.find((r) => r.id === prefer) || null;
+  if (!pick && prefer !== "majority" && site) pick = site;
+
+  const voters = prefer === "majority" ? all : ok;
+  const ipVotes = tally(voters.map((r) => r.ip));
+  const ccVotes = tally(voters.map((r) => r.country));
+  const ip = pick?.ip || ipVotes[0]?.[0];
   const sameIp = all.filter((r) => r.ip === ip);
-  const country = site?.country || tally(sameIp.map((r) => r.country))[0]?.[0] || ccVotes[0]?.[0] || "";
-  const detail = sameIp.find((r) => r.city) || all.find((r) => r.city) || {};
-  const orgSrc = sameIp.find((r) => r.org) || {};
+  const country = pick?.country || tally(sameIp.map((r) => r.country))[0]?.[0] || ccVotes[0]?.[0] || "";
+  const detail = (pick?.city ? pick : null) || sameIp.find((r) => r.city) || {};
+  const orgSrc = (pick?.org ? pick : null) || sameIp.find((r) => r.org) || {};
 
   const agreeIp = ok.filter((r) => r.ip === ip).length;
   const agreeCountry = ok.filter((r) => r.country === country).length;
-  const ips = ipVotes.map(([v]) => v);
+  const ips = tally(ok.map((r) => r.ip)).map(([v]) => v);
   return {
     ip,
     country,
     city: detail.city || "",
     region: detail.region || "",
     org: orgSrc.org || "",
-    via: site ? "site" : "sources",
+    via: !pick ? "sources" : pick === site ? "site" : "source",
+    viaName: pick && pick !== site ? pick.name : "",
     agreeIp,
     agreeCountry,
     total: ok.length,
-    // 通用接口之间 IP 不一致（例如分流、IPv4/IPv6 混用）或与站点看到的不同
     mixed: ips.length > 1 || (site && ips.length > 0 && !ips.includes(site.ip)),
   };
 }
 
-export async function detect(hostname, { sourceIds = DEFAULT_SOURCE_IDS, timeout = 6000, useSiteTrace = true, fetchImpl = fetch } = {}) {
+export async function detect(hostname, { sourceIds = DEFAULT_SOURCE_IDS, timeout = 6000, useSiteTrace = true, prefer = "auto", fetchImpl = fetch } = {}) {
   const srcs = SOURCES.filter((s) => sourceIds.includes(s.id));
   const [site, ...results] = await Promise.all([
     useSiteTrace ? siteTrace(hostname, { timeout: Math.min(timeout, 4000), fetchImpl }) : Promise.resolve(null),
     ...srcs.map((s) => querySource(s, { timeout, fetchImpl })),
   ]);
-  return { result: consensus(results, site), sources: site ? [site, ...results] : results, at: Date.now() };
+  return { result: consensus(results, site, prefer), sources: site ? [site, ...results] : results, at: Date.now() };
 }
