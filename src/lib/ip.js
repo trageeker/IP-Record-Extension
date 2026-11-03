@@ -31,6 +31,7 @@ export const SOURCES = [
   },
 ];
 
+export const SOURCE_HOSTS = [...new Set(SOURCES.map((s) => new URL(s.url).hostname))];
 export const SOURCE_ORIGINS = [...new Set(SOURCES.map((s) => new URL(s.url).origin))];
 export const DEFAULT_SOURCE_IDS = SOURCES.map((s) => s.id);
 

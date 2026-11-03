@@ -9,6 +9,10 @@ import { DEFAULT_SOURCE_IDS } from "./ip.js";
 export const DEFAULT_SETTINGS = {
   autoRecord: true, // 打开弹窗时，没有记录的网站自动检测并记录（已有记录的网站只在手动点「获取当前 IP」时请求）
   resetConnections: true, // 检测前关闭浏览器已有的连接，避免切换节点后仍走旧节点
+  proxyReset: false, // 检测前调用代理内核（mihomo）API 断开旧连接
+  proxyUrl: "http://127.0.0.1:9090",
+  proxySecret: "",
+  proxyScope: "matched", // matched：只断开 IP 源和当前网站的连接；all：断开全部
   mergeSameIp: true, // 同一站点同一 IP 再次记录时只更新「最近使用」，不新增
   useSiteTrace: true,
   sourceIds: DEFAULT_SOURCE_IDS,

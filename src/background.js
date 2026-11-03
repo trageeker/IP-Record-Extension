@@ -1,6 +1,7 @@
 // 后台：检测 + 记录（弹窗关掉也会完成），并按当前标签页是否有记录切换图标和角标。
 
-import { detect, SOURCE_ORIGINS } from "./lib/ip.js";
+import { detect, SOURCE_ORIGINS, SOURCE_HOSTS } from "./lib/ip.js";
+import { closeConnections } from "./lib/mihomo.js";
 import { addDetection, getRecords, getSettings, byRecent } from "./lib/store.js";
 import { hostnameOf, siteOf } from "./lib/domain.js";
 
@@ -62,13 +63,16 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
     if (msg?.type === "detect") {
       const settings = await getSettings();
       const host = hostnameOf(msg.url || "");
+      const proxy = settings.proxyReset
+        ? await closeConnections({ url: settings.proxyUrl, secret: settings.proxySecret, scope: settings.proxyScope }, [...SOURCE_HOSTS, ...(host ? [host] : [])])
+        : null;
       const reset = settings.resetConnections ? await resetConnections() : false;
       const detection = await detect(host, {
         sourceIds: settings.sourceIds, timeout: settings.timeout, useSiteTrace: settings.useSiteTrace && !!host, prefer: settings.prefer,
       });
       let saved = null;
       if (msg.save && host) saved = await addDetection({ url: msg.url, host, detection }, settings);
-      return { ok: true, detection, saved, reset };
+      return { ok: true, detection, saved, reset, proxy };
     }
     if (msg?.type === "refreshIcons") { await refreshAllTabs(); return { ok: true }; }
     return { ok: false, error: "unknown message" };

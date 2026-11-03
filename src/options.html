@@ -83,6 +83,20 @@
         <label class="check"><input type="checkbox" id="s-useSiteTrace"> 网站在 Cloudflare 后面时，以它自己看到的 IP 为准（请求 /cdn-cgi/trace，分流代理时更准）</label>
       </div>
       <div class="block">
+        <h2>代理内核（mihomo / Clash Meta）</h2>
+        <p class="muted">切换节点后还是旧 IP，多半是代理内核里的旧连接还挂在旧节点上，浏览器关不掉。开启后每次检测前先通过内核的外部控制 API 断开这些连接。适用于 Clash Verge Rev、Mihomo Party、FlClash、OpenClash 等 mihomo 内核客户端（在客户端里打开「外部控制」，查看端口和密钥）。</p>
+        <label class="check"><input type="checkbox" id="s-proxyReset"> 检测前断开代理内核里的旧连接</label>
+        <label class="field kv">控制地址<input id="s-proxyUrl" class="input" placeholder="http://127.0.0.1:9090"></label>
+        <label class="field kv">密钥（没设就留空）<input id="s-proxySecret" type="password" class="input" autocomplete="off"></label>
+        <label class="field kv">断开范围
+          <select id="s-proxyScope" class="input narrow">
+            <option value="matched">只断开 IP 源和当前网站的连接</option>
+            <option value="all">断开全部连接（会中断别的下载、视频）</option>
+          </select>
+        </label>
+        <div class="row"><button id="test-proxy" class="btn">测试连接</button><span id="proxy-state" class="muted"></span></div>
+      </div>
+      <div class="block">
         <h2>IP 源</h2>
         <p class="muted">同时查询勾选的源，按多数票得出 IP 和国家。至少保留两个。</p>
         <div id="sources" class="sources-grid"></div>

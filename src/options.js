@@ -3,6 +3,7 @@ import {
   getRecords, getSettings, saveSettings, updateRecord, deleteRecord, clearAll,
   search, byRecent, siteStats, exportJson, exportCsv, importText,
 } from "./lib/store.js";
+import { probe } from "./lib/mihomo.js";
 import { countryName, flag, ago, fmtDate, el, siteUrl, download, stamp, debounce, parseCountry, statsText, showIp, version, ipEl } from "./lib/ui.js";
 
 const $ = (id) => document.getElementById(id);
@@ -156,6 +157,19 @@ async function initSettings() {
     box.checked = !!s[k];
     box.addEventListener("change", async () => { await saveSettings({ [k]: box.checked }); toast("已保存"); });
   }
+  const pbox = $("s-proxyReset");
+  pbox.checked = !!s.proxyReset;
+  pbox.addEventListener("change", async () => { await saveSettings({ proxyReset: pbox.checked }); toast("已保存"); });
+  for (const k of ["proxyUrl", "proxySecret", "proxyScope"]) {
+    const inp = $(`s-${k}`);
+    inp.value = s[k] ?? "";
+    inp.addEventListener("change", async () => { await saveSettings({ [k]: inp.value.trim() }); toast("已保存"); });
+  }
+  $("test-proxy").addEventListener("click", async () => {
+    $("proxy-state").textContent = "测试中…";
+    const r = await probe({ url: $("s-proxyUrl").value, secret: $("s-proxySecret").value.trim() });
+    $("proxy-state").textContent = r.ok ? `已连接 · 内核 ${r.version} · 当前 ${r.connections} 个连接` : `失败：${r.error}`;
+  });
   const pref = $("s-prefer");
   pref.replaceChildren(
     el("option", { value: "auto" }, "自动：网站自身优先，其次多数票"),

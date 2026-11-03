@@ -181,3 +181,20 @@ test("chooseSource + manual without ip", async () => {
   const st = store.siteStats([m, { ...m, id: "2" }], "y.com");
   assert.equal(st.ips.length, 0); assert.equal(st.countries[0].value, "JP");
 });
+
+import { hostMatches, pickConnections, closeConnections } from "../src/lib/mihomo.js";
+test("mihomo: 只挑访问 IP 源/当前网站的连接", () => {
+  assert.ok(hostMatches("api.ip.sb", ["ip.sb"]));
+  assert.ok(!hostMatches("notip.sb", ["ip.sb"]));
+  const list = [
+    { id: "a", metadata: { host: "ipinfo.io" } },
+    { id: "b", metadata: { host: "", sniffHost: "www.cloudflare.com" } },
+    { id: "c", metadata: { host: "youtube.com" } },
+  ];
+  assert.deepEqual(pickConnections(list, ["ipinfo.io", "www.cloudflare.com"]).map((x) => x.id), ["a", "b"]);
+});
+test("mihomo: 控制端口连不上时返回错误而不是抛出", async () => {
+  const r = await closeConnections({ url: "http://127.0.0.1:1", scope: "matched" }, ["ipinfo.io"]);
+  assert.equal(r.ok, false);
+  assert.ok(r.error);
+});

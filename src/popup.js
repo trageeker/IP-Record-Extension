@@ -114,7 +114,8 @@ async function runDetect(save) {
   try {
     const res = await chrome.runtime.sendMessage({ type: "detect", url: state.tab?.url, save });
     if (!res?.ok) throw new Error(res?.error || "检测失败");
-    const { detection, saved } = res;
+    const { detection, saved, proxy } = res;
+    if (proxy && !proxy.ok) toast(`代理内核断开连接失败：${proxy.error}`);
     const c = detection.result;
     state.record = saved?.record || null;
     state.merged = !!saved?.merged;
